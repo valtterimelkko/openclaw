@@ -1,4 +1,6 @@
-# Security - NEVER commit these files
+# ============================================
+# SECURITY - Server Installation Specific
+# ============================================
 # API Keys and Secrets
 *.key
 *.pem
@@ -8,19 +10,12 @@
 *.crt
 *.csr
 *.der
-*.env
-*.env.*
-.env.local
-.env.*.local
 *_SECRET
 *_KEY
 *_TOKEN
 *_PASSWORD
 secrets/
 credentials/
-vault/
-.vault/
-.vault-data/
 
 # OpenClaw Configuration (may contain API keys)
 .openclaw/
@@ -32,6 +27,14 @@ oauth.json
 vault-secrets.env
 init-keys.*
 
+# HashiCorp Vault
+.vault/
+.vault-data/
+vault-data/
+*.hcl
+vault.service
+vault-env.sh
+
 # SSH Keys
 id_rsa
 id_ed25519
@@ -41,11 +44,87 @@ id_dsa
 authorized_keys
 known_hosts
 
-# HashiCorp Vault
-vault-data/
-*.hcl
-vault.service
-vault-env.sh
+# Claude Code
+.claude/
+
+# ============================================
+# OpenClaw Repository Standard Ignores
+# ============================================
+node_modules
+**/node_modules/
+.env
+*.env.*
+.env.local
+.env.*.local
+docker-compose.extra.yml
+dist
+*.bun-build
+pnpm-lock.yaml
+bun.lock
+bun.lockb
+coverage
+.pnpm-store
+.worktrees/
+.DS_Store
+**/.DS_Store
+ui/src/ui/__screenshots__/
+ui/playwright-report/
+ui/test-results/
+
+# Bun build artifacts
+*.bun-build
+apps/macos/.build/
+apps/shared/MoltbotKit/.build/
+**/ModuleCache/
+bin/
+bin/clawdbot-mac
+bin/docs-list
+apps/macos/.build-local/
+apps/macos/.swiftpm/
+apps/shared/MoltbotKit/.swiftpm/
+Core/
+apps/ios/*.xcodeproj/
+apps/ios/*.xcworkspace/
+apps/ios/.swiftpm/
+vendor/
+apps/ios/Clawdbot.xcodeproj/
+apps/ios/Clawdbot.xcodeproj/**
+apps/macos/.build/**
+**/*.bun-build
+apps/ios/*.xcfilelist
+
+# Vendor build artifacts
+vendor/a2ui/renderers/lit/dist/
+src/canvas-host/a2ui/*.bundle.js
+src/canvas-host/a2ui/*.map
+.bundle.hash
+
+# fastlane (iOS)
+apps/ios/fastlane/README.md
+apps/ios/fastlane/report.xml
+apps/ios/fastlane/Preview.html
+apps/ios/fastlane/screenshots/
+apps/ios/fastlane/test_output/
+apps/ios/fastlane/logs/
+apps/ios/fastlane/.env
+apps/ios/fastlane/report.xml
+
+# fastlane build artifacts (local)
+apps/ios/*.ipa
+apps/ios/*.dSYM.zip
+
+# provisioning profiles (local)
+apps/ios/*.mobileprovision
+
+# Local untracked files
+.local/
+.vscode/
+IDENTITY.md
+USER.md
+.tgz
+
+# local tooling
+.serena/
 
 # Backup files
 *.bak
@@ -54,7 +133,7 @@ vault-env.sh
 *.orig
 *~
 
-# Logs (may contain sensitive information)
+# Logs
 *.log
 logs/
 *.log.*
@@ -63,45 +142,6 @@ logs/
 *.db
 *.sqlite
 *.sqlite3
-
-# Node modules and dependencies
-node_modules/
-npm-debug.log*
-yarn-debug.log*
-yarn-error.log*
-package-lock.json
-yarn.lock
-pnpm-lock.yaml
-
-# OS generated files
-.DS_Store
-.DS_Store?
-._*
-.Spotlight-V100
-.Trashes
-ehthumbs.db
-Thumbs.db
-desktop.ini
-
-# IDE
-.vscode/
-.idea/
-*.swp
-*.swo
-*~
-.project
-.classpath
-.settings/
-*.sublime-*
-
-# Temporary files
-tmp/
-temp/
-*.tmp
-*.cache
-
-# Git
-.git/
 
 # Python
 __pycache__/
@@ -112,7 +152,12 @@ env/
 venv/
 ENV/
 
+# Temporary files
+tmp/
+temp/
+*.tmp
+*.cache
+
 # Keep documentation
 !README.md
 !*.md
-.claude/
