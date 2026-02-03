@@ -32,7 +32,11 @@ This OpenClaw installation uses a **secure, vault-backed architecture** on Ubunt
 
 ## Vault Secrets Inventory
 
-The following secret keys are stored in HashiCorp Vault at `secret/data/openclaw`:
+Vault secrets are organized by purpose in separate paths:
+
+### OpenClaw Core Secrets (`secret/data/openclaw`)
+
+The following secret keys are stored in HashiCorp Vault for OpenClaw Gateway operations:
 
 1. **GLM_API_KEY** - API key for GLM-4.7 model (via api.z.ai)
 2. **OPENROUTER_API_KEY** - API key for OpenRouter models
@@ -40,17 +44,36 @@ The following secret keys are stored in HashiCorp Vault at `secret/data/openclaw
 4. **TELEGRAM_USER_ID** - Telegram user ID for allowlist (your user ID)
 5. **GITHUB_PAT** - GitHub Personal Access Token for repository operations
 
+### Skills APIs Credentials (`secret/data/skills-apis`)
+
+Credentials for external APIs used by skills are stored in isolated paths:
+
+- **`secret/skills-apis/amadeus/`**
+  - `test_api_key` - Amadeus flight search API key
+  - `test_api_secret` - Amadeus flight search API secret
+
+- **`secret/skills-apis/github/`**
+  - `token` - GitHub Personal Access Token for skills operations
+
+- **`secret/skills-apis/context7/`**
+  - `api_key` - Context7 documentation API key
+
+**Note**: Skills APIs are stored separately from OpenClaw core secrets to prevent credential exposure in OpenClaw's environment while still being accessible to refactored skill scripts running as the `openclaw` user.
+
 ### Accessing Vault Secrets
 
 ```bash
 # Load Vault environment
 source ~/.vault/vault-env.sh
 
-# View all secret keys (names only)
-curl -s -H "X-Vault-Token: $VAULT_TOKEN" http://127.0.0.1:8200/v1/secret/data/openclaw | grep -o '"[A-Z_]*":' | tr -d '":"'
+# Retrieve OpenClaw core secret
+vault kv get -field=GLM_API_KEY secret/openclaw
 
-# Retrieve specific secret
-curl -s -H "X-Vault-Token: $VAULT_TOKEN" http://127.0.0.1:8200/v1/secret/data/openclaw | grep -o '"SECRET_NAME":"[^"]*"' | cut -d'"' -f4
+# Retrieve skills API secret
+vault kv get -field=test_api_key secret/skills-apis/amadeus
+
+# View all keys in a path
+vault kv get secret/skills-apis/github
 ```
 
 ## Installation Summary
@@ -117,15 +140,31 @@ curl -s -H "X-Vault-Token: $VAULT_TOKEN" http://127.0.0.1:8200/v1/secret/data/op
    - Pushed to GitHub fork: `valtterimelkko/openclaw`
    - Branch: `main` (merged from installation-docs)
 
-8. **Bot Workspace Access**
-   - Bot has read/write access to four GitHub-synced repositories via symlinks in `~/.openclaw/workspace/`:
+8. **Skills APIs & Credential Management**
+   - Created `secret/data/skills-apis/` vault path for external API credentials
+   - Implemented credential fallback chain: Environment Variables → Vault → .bashrc
+   - Populated vault with initial credentials:
+     - `secret/skills-apis/amadeus/` - test_api_key, test_api_secret
+     - `secret/skills-apis/github/` - token
+     - `secret/skills-apis/context7/` - api_key
+   - Created `CREDENTIAL_LOADING_GUIDE.md` in `.skills-global` for refactoring reference
+   - Allows skills to load credentials securely from vault when running as openclaw user
+
+9. **Bot Workspace Access via Symlinks & ACL**
+   - Bot has secure read/write access to four GitHub-synced repositories via symlinks in `~/.openclaw/workspace/`:
      - `skills-global` → `/root/.skills-global`
      - `ai_product_visualizer` → `/root/ai_product_visualizer`
      - `buildersuite` → `/root/buildersuite`
      - `meta-project-for-mvps` → `/root/meta-project-for-mvps`
-   - **Security Model**: All folders are synced to GitHub, providing automatic backup and data loss protection
+   - **Access Control Implementation**:
+     - ACL on `/root`: `user:openclaw:--x` (execute-only, allows traversal)
+     - Target directories: Group-owned by `openclaw` with `rwx` permissions
+     - Git safe.directory configured for all repositories
+   - **Security Model**:
+     - All folders are synced to GitHub, providing automatic backup and data loss protection
+     - `/root/.bashrc` protected with `600` permissions (root-only), preventing credential exposure
    - **Risk Mitigation**: Even if bot is prompt-injected to run destructive commands, data can be recovered from GitHub
-   - **Access Level**: Read/write to workspace directories, no root/system access
+   - **Access Level**: Read/write to workspace directories, no root/system access, no credentials exposure
 
 ## Service Management
 
@@ -211,14 +250,80 @@ The OpenClaw bot has read/write access to four GitHub-synced repositories via sy
 | `buildersuite` | `/root/buildersuite` | Builder suite projects | ✅ Synced |
 | `meta-project-for-mvps` | `/root/meta-project-for-mvps` | Meta project for MVPs | ✅ Synced |
 
+### Access Implementation Details
+
+#### Symlinks
+
+Symlinks are created in `~/.openclaw/workspace/` pointing to `/root/` directories:
+
+```bash
+# Symlinks located at:
+ls -la ~/.openclaw/workspace/ | grep -E "skills-global|ai_product|buildersuite|meta-project"
+
+# Each symlink points to a root-owned directory:
+skills-global -> /root/.skills-global
+ai_product_visualizer -> /root/ai_product_visualizer
+buildersuite -> /root/buildersuite
+meta-project-for-mvps -> /root/meta-project-for-mvps
+```
+
+#### ACL (Access Control List) Security
+
+Access to `/root/` for the `openclaw` user is controlled via ACL, not standard Unix permissions:
+
+```bash
+# Check ACL on /root:
+getfacl /root | grep openclaw
+# Result: user:openclaw:--x (execute-only, no read)
+```
+
+This allows openclaw to:
+- ✅ Traverse into `/root/` to reach symlinks
+- ✅ Access symlinked directories and their contents
+- ❌ List `/root/` directory contents
+- ❌ Read `/root/.bashrc` or other root files
+
+#### Protected Files
+
+- `/root/.bashrc` has permissions `600` (root-only)
+- Openclaw cannot read it even with ACL traversal
+- This prevents credential exposure via prompt injection
+
+#### Repository Permissions
+
+All target directories are:
+- Group-owned by `openclaw` group
+- Have group read/write/execute permissions (`rwx`)
+- Allow openclaw to read, write, and execute files
+
 ### Security Model
 
 - **Access Scope**: Bot can read/write files within workspace symlinks only
 - **No System Access**: Bot cannot modify system files, config, or root directories
+- **No .bashrc Access**: Bot cannot read root's .bashrc (credentials protected)
 - **Data Protection**: All accessible folders are synced to GitHub
 - **Recovery**: Any destructive action can be recovered from GitHub history
 - **Isolation**: Bot runs as non-root `openclaw` user with limited privileges
 - **Risk Mitigation**: Even if bot is prompt-injected, GitHub provides automatic backup and recovery
+
+### Git Operations
+
+Git is configured to trust root-owned repositories from the openclaw user:
+
+```bash
+# Already configured in openclaw's git config:
+git config --global --list | grep safe.directory
+# Shows:
+# safe.directory=/root/.skills-global
+# safe.directory=/root/ai_product_visualizer
+# safe.directory=/root/buildersuite
+# safe.directory=/root/meta-project-for-mvps
+```
+
+This allows openclaw to:
+- Clone/pull from repositories
+- Commit changes
+- Push to remote
 
 ### Accessing Repositories from Bot
 
@@ -231,6 +336,60 @@ Ask the bot to work on files within these directories:
 ```
 
 The bot will work within the workspace and changes are preserved in the target directories (which sync to GitHub).
+
+### Managing Workspace Access
+
+#### Adding New Directories
+
+To grant openclaw read/write access to a new directory in `/root/`:
+
+**As root user:**
+```bash
+# 1. Set group ownership to openclaw
+sudo chgrp -R openclaw /root/new-directory
+
+# 2. Grant group read/write/execute permissions
+sudo chmod -R g+rwx /root/new-directory
+
+# 3. Create symlink in openclaw's workspace
+sudo ln -s /root/new-directory /home/openclaw/.openclaw/workspace/new-directory
+
+# 4. Add to git safe.directory list (as openclaw user)
+sudo su - openclaw -c "git config --global --add safe.directory /root/new-directory"
+```
+
+#### Removing Directory Access
+
+To revoke openclaw's access to a directory:
+
+**As root user:**
+```bash
+# 1. Remove symlink from workspace
+sudo rm /home/openclaw/.openclaw/workspace/directory-name
+
+# 2. Remove from git safe.directory (as openclaw user)
+sudo su - openclaw -c "git config --global --unset safe.directory /root/directory-name"
+
+# 3. Revoke group permissions (optional)
+sudo chmod -R g-rwx /root/directory-name
+sudo chgrp -R root /root/directory-name
+```
+
+#### Verifying Access
+
+To verify openclaw can access a directory:
+
+**As openclaw user:**
+```bash
+# 1. Check symlink exists
+ls -la ~/.openclaw/workspace/directory-name
+
+# 2. List directory contents
+ls ~/.openclaw/workspace/directory-name
+
+# 3. Test git operations
+cd ~/.openclaw/workspace/directory-name && git status
+```
 
 ## Troubleshooting Guide
 
