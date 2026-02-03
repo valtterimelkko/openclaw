@@ -1,9 +1,9 @@
 ---
 name: coding-agent
-description: Run Codex CLI, Claude Code, OpenCode, or Pi Coding Agent via background process for programmatic control.
+description: Run Codex CLI, Claude Code, Kimi Code CLI, OpenCode, or Pi Coding Agent via background process for programmatic control.
 metadata:
   {
-    "openclaw": { "emoji": "🧩", "requires": { "anyBins": ["claude", "codex", "opencode", "pi"] } },
+    "openclaw": { "emoji": "🧩", "requires": { "anyBins": ["claude", "codex", "kimi", "opencode", "pi"] } },
   }
 ---
 
@@ -13,7 +13,7 @@ Use **bash** (with optional background mode) for all coding agent work. Simple a
 
 ## ⚠️ PTY Mode Required!
 
-Coding agents (Codex, Claude Code, Pi) are **interactive terminal applications** that need a pseudo-terminal (PTY) to work correctly. Without PTY, you'll get broken output, missing colors, or the agent may hang.
+Coding agents (Codex, Claude Code, Kimi, Pi) are **interactive terminal applications** that need a pseudo-terminal (PTY) to work correctly. Without PTY, you'll get broken output, missing colors, or the agent may hang.
 
 **Always use `pty:true`** when running coding agents:
 
@@ -53,17 +53,22 @@ bash command:"codex exec 'Your prompt'"
 
 ## Quick Start: One-Shot Tasks
 
-For quick prompts/chats, create a temp git repo and run:
+For quick prompts/chats:
 
 ```bash
-# Quick chat (Codex needs a git repo!)
+# Kimi (no git required!)
+SCRATCH=$(mktemp -d)
+bash pty:true workdir:$SCRATCH command:"kimi -p 'Your prompt here'"
+
+# Codex (needs a git repo!)
 SCRATCH=$(mktemp -d) && cd $SCRATCH && git init && codex exec "Your prompt here"
 
 # Or in a real project - with PTY!
+bash pty:true workdir:~/Projects/myproject command:"kimi -p 'Add error handling to the API calls'"
 bash pty:true workdir:~/Projects/myproject command:"codex exec 'Add error handling to the API calls'"
 ```
 
-**Why git init?** Codex refuses to run outside a trusted git directory. Creating a temp repo solves this for scratch work.
+**Why git init?** Codex refuses to run outside a trusted git directory. Kimi doesn't need git - it works in any directory.
 
 ---
 
@@ -72,7 +77,10 @@ bash pty:true workdir:~/Projects/myproject command:"codex exec 'Add error handli
 For longer tasks, use background mode with PTY:
 
 ```bash
-# Start agent in target directory (with PTY!)
+# Kimi (no git needed!)
+bash pty:true workdir:~/project background:true command:"kimi --yolo -p 'Build a snake game'"
+
+# Codex (needs git repo!)
 bash pty:true workdir:~/project background:true command:"codex exec --full-auto 'Build a snake game'"
 # Returns sessionId for tracking
 
@@ -192,6 +200,126 @@ bash pty:true command:"pi --provider openai --model gpt-4o-mini -p 'Your task'"
 
 ---
 
+## Kimi Code CLI
+
+**Install:** `curl -LsSf https://code.kimi.com/install.sh | bash` or `uv tool install --python 3.13 kimi-cli`
+
+**Git requirement:** None! Kimi works in any directory (unlike Codex which requires git).
+
+### Flags
+
+| Flag | Short | Effect |
+| ---- | ----- | ------ |
+| `--prompt` | `-p` | One-shot prompt, exits when done |
+| `--command` | `-c` | Alias for `--prompt` |
+| `--yolo` | `-y` | Auto-approve all operations |
+| `--yes` | | Alias for `--yolo` |
+| `--auto-approve` | | Alias for `--yolo` |
+| `--model` | `-m` | Specify LLM model |
+| `--thinking` | | Enable thinking mode (deep reasoning) |
+| `--no-thinking` | | Disable thinking mode |
+| `--session` | `-S` | Resume session with specified ID |
+| `--continue` | `-C` | Continue previous session in current directory |
+| `--max-ralph-iterations` | | Loop prompt N times until `<choice>STOP</choice>` |
+| `--print` | | Non-interactive print mode (implies `--yolo`) |
+| `--quiet` | | `--print --output-format text --final-message-only` |
+| `--work-dir` | `-w` | Working directory (default: current) |
+
+### Basic Usage
+
+```bash
+# Interactive mode
+bash pty:true workdir:~/project command:"kimi"
+
+# One-shot prompt (exits when done)
+bash pty:true workdir:~/project command:"kimi -p 'Your task'"
+
+# With auto-approve
+bash pty:true workdir:~/project command:"kimi --yolo -p 'Your task'"
+
+# Background session
+bash pty:true workdir:~/project background:true command:"kimi -p 'Your task'"
+```
+
+### Building/Creating
+
+```bash
+# Quick one-shot with auto-approve
+bash pty:true workdir:~/project command:"kimi --yolo -p 'Build a dark mode toggle'"
+
+# Background for longer work
+bash pty:true workdir:~/project background:true command:"kimi --yolo -p 'Refactor the auth module'"
+
+# With thinking mode enabled (deep reasoning)
+bash pty:true workdir:~/project command:"kimi --thinking -p 'Implement a complex algorithm'"
+```
+
+### Session Management
+
+```bash
+# Resume a previous session
+bash pty:true workdir:~/project command:"kimi --continue"
+
+# Resume specific session by ID
+bash pty:true workdir:~/project command:"kimi --session abc123 -p 'Continue working on this'"
+
+# Note: --continue and --session are mutually exclusive
+```
+
+### Loop Control (Ralph Loop)
+
+Ralph Loop feeds the same prompt repeatedly until the agent outputs `<choice>STOP</choice>` or the iteration limit is reached. Great for iterative tasks!
+
+```bash
+# Loop up to 5 times
+bash pty:true workdir:~/project command:"kimi --max-ralph-iterations 5 -p 'Refactor this code until it passes all tests'"
+
+# Unlimited iterations (until STOP)
+bash pty:true workdir:~/project command:"kimi --max-ralph-iterations -1 -p 'Keep improving this implementation'"
+
+# Disabled (default)
+bash pty:true workdir:~/project command:"kimi --max-ralph-iterations 0 -p 'One-shot task'"
+```
+
+### Thinking Mode
+
+Thinking mode enables deep reasoning before the model responds. Requires a model that supports the `thinking` capability.
+
+```bash
+# Enable thinking mode
+bash pty:true workdir:~/project command:"kimi --thinking -p 'Design a complex system architecture'"
+
+# Explicitly disable thinking mode
+bash pty:true workdir:~/project command:"kimi --no-thinking -p 'Quick question about this function'"
+
+# Uses last session's setting if not specified
+bash pty:true workdir:~/project command:"kimi -p 'Your task'"
+```
+
+### Scratch Work (No Git Required!)
+
+Unlike Codex, Kimi doesn't require a git repository. Just use any directory:
+
+```bash
+# Create temp directory - no git needed!
+SCRATCH=$(mktemp -d)
+bash pty:true workdir:$SCRATCH command:"kimi --yolo -p 'Your scratch task'"
+```
+
+### Models & Providers
+
+Kimi supports multiple providers:
+- **Kimi Code** (default) - Kimi's platform with search/fetch services
+- **Moonshot AI Open Platform** (China/global)
+- **OpenAI** (Chat Completions API)
+- **Anthropic** (Claude API)
+- **Google Gemini**
+- **Google Vertex AI**
+
+Models can have capabilities like `thinking`, `always_thinking`, `image_in`, `video_in`. Configure in `~/.kimi/config.toml` or use `/login` command.
+
+---
+
 ## Parallel Issue Fixing with git worktrees
 
 For fixing multiple issues in parallel, use git worktrees:
@@ -201,7 +329,12 @@ For fixing multiple issues in parallel, use git worktrees:
 git worktree add -b fix/issue-78 /tmp/issue-78 main
 git worktree add -b fix/issue-99 /tmp/issue-99 main
 
-# 2. Launch Codex in each (background + PTY!)
+# 2. Launch agents in each (background + PTY!)
+# Kimi (no git repo needed in worktree)
+bash pty:true workdir:/tmp/issue-78 background:true command:"pnpm install && kimi --yolo -p 'Fix issue #78: <description>. Commit and push.'"
+bash pty:true workdir:/tmp/issue-99 background:true command:"pnpm install && kimi --yolo -p 'Fix issue #99: <description>. Commit and push.'"
+
+# Or use Codex (requires git repo)
 bash pty:true workdir:/tmp/issue-78 background:true command:"pnpm install && codex --yolo 'Fix issue #78: <description>. Commit and push.'"
 bash pty:true workdir:/tmp/issue-99 background:true command:"pnpm install && codex --yolo 'Fix issue #99: <description>. Commit and push.'"
 
@@ -266,6 +399,12 @@ openclaw gateway wake --text "Done: [brief summary of what was built]" --mode no
 **Example:**
 
 ```bash
+# Kimi
+bash pty:true workdir:~/project background:true command:"kimi --yolo -p 'Build a REST API for todos.
+
+When completely finished, run: openclaw gateway wake --text \"Done: Built todos REST API with CRUD endpoints\" --mode now'"
+
+# Codex
 bash pty:true workdir:~/project background:true command:"codex --yolo exec 'Build a REST API for todos.
 
 When completely finished, run: openclaw gateway wake --text \"Done: Built todos REST API with CRUD endpoints\" --mode now'"
@@ -278,7 +417,9 @@ This triggers an immediate wake event — Skippy gets pinged in seconds, not 10 
 ## Learnings (Jan 2026)
 
 - **PTY is essential:** Coding agents are interactive terminal apps. Without `pty:true`, output breaks or agent hangs.
-- **Git repo required:** Codex won't run outside a git directory. Use `mktemp -d && git init` for scratch work.
-- **exec is your friend:** `codex exec "prompt"` runs and exits cleanly - perfect for one-shots.
+- **Git repo required:** Codex won't run outside a git directory. Use `mktemp -d && git init` for scratch work. **Kimi doesn't need git** - works in any directory.
+- **exec is your friend:** `codex exec "prompt"` runs and exits cleanly - perfect for one-shots. Kimi uses `-p` or `--prompt` instead.
 - **submit vs write:** Use `submit` to send input + Enter, `write` for raw data without newline.
 - **Sass works:** Codex responds well to playful prompts. Asked it to write a haiku about being second fiddle to a space lobster, got: _"Second chair, I code / Space lobster sets the tempo / Keys glow, I follow"_ 🦞
+- **Kimi's Ralph Loop:** `--max-ralph-iterations N` is great for iterative tasks - feeds the same prompt repeatedly until `<choice>STOP</choice>`.
+- **Kimi's Thinking Mode:** `--thinking` enables deep reasoning (like Claude's thinking models). Requires a model that supports the `thinking` capability.
