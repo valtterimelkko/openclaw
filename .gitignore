@@ -1,6 +1,11 @@
 # ============================================
 # SECURITY - Server Installation Specific
 # ============================================
+
+# Server installation documentation (contains sensitive architecture info)
+README_Tech.md
+INSTALLATION.md
+
 # API Keys and Secrets
 *.key
 *.pem
