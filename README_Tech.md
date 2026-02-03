@@ -117,6 +117,16 @@ curl -s -H "X-Vault-Token: $VAULT_TOKEN" http://127.0.0.1:8200/v1/secret/data/op
    - Pushed to GitHub fork: `valtterimelkko/openclaw`
    - Branch: `main` (merged from installation-docs)
 
+8. **Bot Workspace Access**
+   - Bot has read/write access to four GitHub-synced repositories via symlinks in `~/.openclaw/workspace/`:
+     - `skills-global` → `/root/.skills-global`
+     - `ai_product_visualizer` → `/root/ai_product_visualizer`
+     - `buildersuite` → `/root/buildersuite`
+     - `meta-project-for-mvps` → `/root/meta-project-for-mvps`
+   - **Security Model**: All folders are synced to GitHub, providing automatic backup and data loss protection
+   - **Risk Mitigation**: Even if bot is prompt-injected to run destructive commands, data can be recovered from GitHub
+   - **Access Level**: Read/write to workspace directories, no root/system access
+
 ## Service Management
 
 ### Check Service Status
@@ -187,6 +197,40 @@ sudo systemctl enable vault openclaw
 - **Auth Mode**: Token-based
 - **Auth Token**: Stored in `~/.openclaw/openclaw.json`
 - **Access**: Localhost only (not exposed to internet)
+
+## Bot Workspace Access
+
+The OpenClaw bot has read/write access to four GitHub-synced repositories via symlinks in the workspace. This allows the bot to help with development tasks while maintaining data safety through GitHub backups.
+
+### Accessible Repositories
+
+| Symlink | Target Directory | Purpose | GitHub Sync |
+|---------|-----------------|---------|-------------|
+| `skills-global` | `/root/.skills-global` | Global skills library | ✅ Synced |
+| `ai_product_visualizer` | `/root/ai_product_visualizer` | Product visualization tools | ✅ Synced |
+| `buildersuite` | `/root/buildersuite` | Builder suite projects | ✅ Synced |
+| `meta-project-for-mvps` | `/root/meta-project-for-mvps` | Meta project for MVPs | ✅ Synced |
+
+### Security Model
+
+- **Access Scope**: Bot can read/write files within workspace symlinks only
+- **No System Access**: Bot cannot modify system files, config, or root directories
+- **Data Protection**: All accessible folders are synced to GitHub
+- **Recovery**: Any destructive action can be recovered from GitHub history
+- **Isolation**: Bot runs as non-root `openclaw` user with limited privileges
+- **Risk Mitigation**: Even if bot is prompt-injected, GitHub provides automatic backup and recovery
+
+### Accessing Repositories from Bot
+
+Ask the bot to work on files within these directories:
+```
+"Check /workspace/skills-global/config.json"
+"Create a new file in /workspace/buildersuite/..."
+"List files in /workspace/meta-project-for-mvps/"
+"Update /workspace/ai_product_visualizer/..."
+```
+
+The bot will work within the workspace and changes are preserved in the target directories (which sync to GitHub).
 
 ## Troubleshooting Guide
 
@@ -490,6 +534,11 @@ done
 ### Data
 - **Vault Data**: `~/.vault/data/` (700)
 - **OpenClaw Workspace**: `~/.openclaw/workspace/` (700)
+  - **Symlinks to Bot-Accessible Repositories**:
+    - `skills-global` → `/root/.skills-global` (GitHub-synced)
+    - `ai_product_visualizer` → `/root/ai_product_visualizer` (GitHub-synced)
+    - `buildersuite` → `/root/buildersuite` (GitHub-synced)
+    - `meta-project-for-mvps` → `/root/meta-project-for-mvps` (GitHub-synced)
 - **OpenClaw Agents**: `~/.openclaw/agents/` (700)
 - **OpenClaw Credentials**: `~/.openclaw/credentials/` (700)
 
@@ -626,10 +675,15 @@ sudo systemctl restart openclaw
 ---
 
 **Installation Date**: 2026-02-02
-**Last Updated**: 2026-02-03
+**Last Updated**: 2026-02-03 (Bot workspace access added)
 **OpenClaw Version**: 2026.2.1
 **Vault Version**: 1.18.3
 **Node Version**: v24.13.0
 **Server User**: openclaw
 **Operating System**: Ubuntu 24.04 LTS
 **Gateway Command**: `openclaw gateway run` (started via wrapper script)
+
+### Bot Workspace Access
+- **4 GitHub-synced repositories** accessible via workspace symlinks
+- **Data protection**: All changes backed up to GitHub
+- **Use case**: Development assistance with code files and projects
