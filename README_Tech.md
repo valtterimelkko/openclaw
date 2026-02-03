@@ -672,6 +672,58 @@ curl -X POST http://127.0.0.1:8200/v1/secret/data/openclaw \
 sudo systemctl restart openclaw
 ```
 
+### Add New Keys to Vault
+
+To add new API keys or configuration values to Vault (e.g., a new model provider or service token):
+
+```bash
+# Load Vault environment
+source ~/.vault/vault-env.sh
+
+# Retrieve current secrets
+CURRENT=$(curl -s -H "X-Vault-Token: $VAULT_TOKEN" \
+  http://127.0.0.1:8200/v1/secret/data/openclaw | jq '.data.data')
+
+# Add new key while preserving existing ones
+curl -X POST http://127.0.0.1:8200/v1/secret/data/openclaw \
+  -H "X-Vault-Token: $VAULT_TOKEN" \
+  -d '{
+    "data": {
+      "GLM_API_KEY": "existing-value",
+      "OPENROUTER_API_KEY": "existing-value",
+      "TELEGRAM_BOT_TOKEN": "existing-value",
+      "TELEGRAM_USER_ID": "existing-value",
+      "GITHUB_PAT": "existing-value",
+      "NEW_KEY_NAME": "new-value-here"
+    }
+  }'
+
+# Verify the new key was added
+curl -s -H "X-Vault-Token: $VAULT_TOKEN" \
+  http://127.0.0.1:8200/v1/secret/data/openclaw | jq '.data.data | keys'
+
+# Update OpenClaw config to reference the new key
+# Edit ~/.openclaw/openclaw.json and add reference to the new key using ${NEW_KEY_NAME}
+nano ~/.openclaw/openclaw.json
+
+# Restart OpenClaw to load new configuration
+sudo systemctl restart openclaw
+```
+
+**Important Notes**:
+1. **Preserve Existing Keys**: Always include all existing keys in the update payload or they will be lost
+2. **Environment Variable Format**: Use `${KEY_NAME}` format in config files to reference Vault secrets
+3. **Restart Required**: OpenClaw must be restarted to load new environment variables
+4. **Key Naming**: Use UPPERCASE_WITH_UNDERSCORES for consistency
+5. **No Special Characters**: Keep key names alphanumeric and underscores only
+6. **Vault Token**: The token from `~/.vault/vault-env.sh` must still be valid (re-login if expired)
+
+**Example Use Cases**:
+- Adding a new model provider API key (e.g., `CLAUDE_API_KEY`)
+- Adding service credentials (e.g., `DATABASE_URL`, `REDIS_PASSWORD`)
+- Adding notification service tokens (e.g., `SLACK_WEBHOOK_URL`)
+- Adding rate limit or feature configuration keys
+
 ---
 
 **Installation Date**: 2026-02-02
