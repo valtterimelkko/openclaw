@@ -43,6 +43,7 @@ The following secret keys are stored in HashiCorp Vault for OpenClaw Gateway ope
 3. **TELEGRAM_BOT_TOKEN** - Telegram bot authentication token
 4. **TELEGRAM_USER_ID** - Telegram user ID for allowlist (your user ID)
 5. **GITHUB_PAT** - GitHub Personal Access Token for repository operations
+6. **KIMI_API_KEY** - API key for Kimi Code CLI (Moonshot AI)
 
 ### Skills APIs Credentials (`secret/data/skills-apis`)
 
@@ -57,6 +58,10 @@ Credentials for external APIs used by skills are stored in isolated paths:
 
 - **`secret/skills-apis/context7/`**
   - `api_key` - Context7 documentation API key
+
+- **`secret/skills-apis/gmail/`**
+  - `email` - Gmail account email address (valtteri.melkko@gmail.com)
+  - `app_password` - Gmail App Password (16-character IMAP authentication token)
 
 **Note**: Skills APIs are stored separately from OpenClaw core secrets to prevent credential exposure in OpenClaw's environment while still being accessible to refactored skill scripts running as the `openclaw` user.
 
@@ -147,15 +152,17 @@ vault kv get secret/skills-apis/github
      - `secret/skills-apis/amadeus/` - test_api_key, test_api_secret
      - `secret/skills-apis/github/` - token
      - `secret/skills-apis/context7/` - api_key
+     - `secret/skills-apis/gmail/` - email, app_password
    - Created `CREDENTIAL_LOADING_GUIDE.md` in `.skills-global` for refactoring reference
    - Allows skills to load credentials securely from vault when running as openclaw user
 
 9. **Bot Workspace Access via Symlinks & ACL**
-   - Bot has secure read/write access to four GitHub-synced repositories via symlinks in `~/.openclaw/workspace/`:
+   - Bot has secure read/write access to five directories via symlinks in `~/.openclaw/workspace/`:
      - `skills-global` → `/root/.skills-global`
      - `ai_product_visualizer` → `/root/ai_product_visualizer`
      - `buildersuite` → `/root/buildersuite`
      - `meta-project-for-mvps` → `/root/meta-project-for-mvps`
+     - `opari` → `/root/opari`
    - **Access Control Implementation**:
      - ACL on `/root`: `user:openclaw:--x` (execute-only, allows traversal)
      - Target directories: Group-owned by `openclaw` with `rwx` permissions
@@ -239,7 +246,7 @@ sudo systemctl enable vault openclaw
 
 ## Bot Workspace Access
 
-The OpenClaw bot has read/write access to four GitHub-synced repositories via symlinks in the workspace. This allows the bot to help with development tasks while maintaining data safety through GitHub backups.
+The OpenClaw bot has read/write access to five directories via symlinks in the workspace. This allows the bot to help with development tasks while maintaining data safety through GitHub backups (where applicable).
 
 ### Accessible Repositories
 
@@ -249,6 +256,7 @@ The OpenClaw bot has read/write access to four GitHub-synced repositories via sy
 | `ai_product_visualizer` | `/root/ai_product_visualizer` | Product visualization tools | ✅ Synced |
 | `buildersuite` | `/root/buildersuite` | Builder suite projects | ✅ Synced |
 | `meta-project-for-mvps` | `/root/meta-project-for-mvps` | Meta project for MVPs | ✅ Synced |
+| `opari` | `/root/opari` | Opari project files | ❌ Not synced |
 
 ### Access Implementation Details
 
@@ -258,13 +266,14 @@ Symlinks are created in `~/.openclaw/workspace/` pointing to `/root/` directorie
 
 ```bash
 # Symlinks located at:
-ls -la ~/.openclaw/workspace/ | grep -E "skills-global|ai_product|buildersuite|meta-project"
+ls -la ~/.openclaw/workspace/ | grep -E "skills-global|ai_product|buildersuite|meta-project|opari"
 
 # Each symlink points to a root-owned directory:
 skills-global -> /root/.skills-global
 ai_product_visualizer -> /root/ai_product_visualizer
 buildersuite -> /root/buildersuite
 meta-project-for-mvps -> /root/meta-project-for-mvps
+opari -> /root/opari
 ```
 
 #### ACL (Access Control List) Security
@@ -318,6 +327,7 @@ git config --global --list | grep safe.directory
 # safe.directory=/root/ai_product_visualizer
 # safe.directory=/root/buildersuite
 # safe.directory=/root/meta-project-for-mvps
+# safe.directory=/root/opari
 ```
 
 This allows openclaw to:
@@ -333,6 +343,7 @@ Ask the bot to work on files within these directories:
 "Create a new file in /workspace/buildersuite/..."
 "List files in /workspace/meta-project-for-mvps/"
 "Update /workspace/ai_product_visualizer/..."
+"Work on files in /workspace/opari/..."
 ```
 
 The bot will work within the workspace and changes are preserved in the target directories (which sync to GitHub).
@@ -693,11 +704,12 @@ done
 ### Data
 - **Vault Data**: `~/.vault/data/` (700)
 - **OpenClaw Workspace**: `~/.openclaw/workspace/` (700)
-  - **Symlinks to Bot-Accessible Repositories**:
+  - **Symlinks to Bot-Accessible Directories**:
     - `skills-global` → `/root/.skills-global` (GitHub-synced)
     - `ai_product_visualizer` → `/root/ai_product_visualizer` (GitHub-synced)
     - `buildersuite` → `/root/buildersuite` (GitHub-synced)
     - `meta-project-for-mvps` → `/root/meta-project-for-mvps` (GitHub-synced)
+    - `opari` → `/root/opari` (not synced)
 - **OpenClaw Agents**: `~/.openclaw/agents/` (700)
 - **OpenClaw Credentials**: `~/.openclaw/credentials/` (700)
 
@@ -886,7 +898,7 @@ sudo systemctl restart openclaw
 ---
 
 **Installation Date**: 2026-02-02
-**Last Updated**: 2026-02-03 (Bot workspace access added)
+**Last Updated**: 2026-02-08 (Added Gmail credentials to vault)
 **OpenClaw Version**: 2026.2.1
 **Vault Version**: 1.18.3
 **Node Version**: v24.13.0
@@ -895,6 +907,6 @@ sudo systemctl restart openclaw
 **Gateway Command**: `openclaw gateway run` (started via wrapper script)
 
 ### Bot Workspace Access
-- **4 GitHub-synced repositories** accessible via workspace symlinks
+- **5 directories** accessible via workspace symlinks (4 GitHub-synced, 1 not synced)
 - **Data protection**: All changes backed up to GitHub
 - **Use case**: Development assistance with code files and projects
