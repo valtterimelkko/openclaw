@@ -63,11 +63,13 @@ node_modules
 .env.*.local
 docker-compose.extra.yml
 dist
-*.bun-build
 pnpm-lock.yaml
 bun.lock
 bun.lockb
 coverage
+__pycache__/
+*.pyc
+.tsbuildinfo
 .pnpm-store
 .worktrees/
 .DS_Store
@@ -75,6 +77,11 @@ coverage
 ui/src/ui/__screenshots__/
 ui/playwright-report/
 ui/test-results/
+
+# Android build artifacts
+apps/android/.gradle/
+apps/android/app/build/
+apps/android/.cxx/
 
 # Bun build artifacts
 *.bun-build
@@ -112,7 +119,6 @@ apps/ios/fastlane/screenshots/
 apps/ios/fastlane/test_output/
 apps/ios/fastlane/logs/
 apps/ios/fastlane/.env
-apps/ios/fastlane/report.xml
 
 # fastlane build artifacts (local)
 apps/ios/*.ipa
@@ -123,7 +129,6 @@ apps/ios/*.mobileprovision
 
 # Local untracked files
 .local/
-.vscode/
 IDENTITY.md
 USER.md
 .tgz
@@ -162,6 +167,12 @@ tmp/
 temp/
 *.tmp
 *.cache
+
+# Agent credentials and memory (NEVER COMMIT)
+/memory/
+.agent/*.json
+!.agent/workflows/
+local/
 
 # Keep documentation
 !README.md
