@@ -7,6 +7,44 @@ Best practices for using Kimi CLI via OpenClaw, based on extensive testing.
 ```
 Phase 1: Creation → Direct file writes (not "return content")
 Phase 2: Editing  → StrReplaceFile for targeted changes
+Phase 3: Fallback → StrReplaceFile (experimental) or return content
+```
+
+---
+
+## Wording Matters
+
+**The phrasing of your prompt significantly affects reliability.**
+
+### What Worked in Testing
+
+| Phrasing | Result |
+|----------|--------|
+| "Write all files directly to disk" | ✅ 17 files created in ~10 min |
+| "Create PRD.md" (specific file) | ❌ Hung indefinitely |
+| "Build a portfolio with index.html, css/, js/..." | ✅ Works reliably |
+
+**Theory:** Explicit "write to disk" language activates Kimi's file operation mode directly, while ambiguous phrasing may trigger internal deliberation loops.
+
+### Recommended Wording
+
+**✅ Good - Explicit "write" language:**
+```bash
+bash workdir:~/project command:"kimi --yolo -p 'Write all files directly to disk:
+- index.html
+- css/styles.css
+- js/app.js'"
+```
+
+**✅ Good - Action-oriented:**
+```bash
+bash workdir:~/project command:"kimi --yolo -p 'Build a React app. Create the following files...'"
+```
+
+**⚠️ Avoid - Passive language:**
+```bash
+# Less reliable - may hang
+bash workdir:~/project command:"kimi --yolo -p 'PRD.md should contain...'"
 ```
 
 ---
@@ -30,6 +68,11 @@ bash workdir:~/project timeout:300 command:"kimi --yolo -p 'Build a portfolio wi
 - Uses internal SetTodoList for progress tracking
 - No streaming output issues
 - Fastest approach for new projects
+
+**After creation, always verify:**
+```bash
+bash workdir:~/project command:"find . -type f | wc -l && tree -L 2"
+```
 
 ---
 
@@ -201,20 +244,105 @@ This is normal and indicates healthy execution.
 
 ## Troubleshooting
 
-### "Composing..." for 10+ Minutes
+### "Composing..." for Too Long
 
-**Likely causes:**
-- Genuinely complex task (wait longer)
-- Attempting multi-file content return (kill and retry with StrReplaceFile)
+**If "Composing..." shows for >2 minutes without file writes, take action.**
 
-**Solution:**
+| Duration | Action |
+|----------|--------|
+| 0-2 min | Normal for task startup |
+| 2-5 min | Wait - may be planning complex changes |
+| 5-10 min | Check SetTodoList progress; if no files created, consider killing |
+| 10+ min | **Kill and retry** - likely hung |
+
+**Kill stuck session:**
 ```bash
-# Kill stuck session
 process action:kill sessionId:XXX
-
-# Retry with StrReplaceFile approach
-bash workdir:~/project command:"kimi --yolo -p 'Make the change with StrReplaceFile'"
 ```
+
+**Retry strategies:**
+1. **Retry with different wording** (see "Wording Matters" above)
+2. **Use StrReplaceFile** for the specific file
+3. **Use return-content fallback** (last resort)
+
+---
+
+### Experimental: StrReplaceFile Fallback
+
+> 🧪 **EXPERIMENTAL** - Try this before return-content fallback
+
+If direct file writes hang, try creating empty files first, then using StrReplaceFile:
+
+```bash
+# Step 1: Create empty file (may work when "create with content" hangs)
+bash workdir:~/project command:"kimi --yolo -p 'Create empty file PRD.md'"
+
+# Step 2: Populate with StrReplaceFile
+bash workdir:~/project timeout:120 command:"kimi --yolo -p 'Write the PRD content to PRD.md. Use StrReplaceFile.'"
+```
+
+**Why this might work:** Keeps Kimi in "file operation mode" instead of switching to "content generation mode."
+
+**Test results:** Inconclusive - needs more validation. Documented as experimental.
+
+---
+
+### Progress Visibility
+
+For long-running tasks, you won't see streaming progress. The output appears all at once when complete.
+
+**What to expect:**
+```
+# You see this immediately:
+Process still running...
+
+# Then after 5-10 minutes, all output appears at once:
+✓ Created css/variables.css
+✓ Created css/components.css
+...
+```
+
+**Monitoring options:**
+1. **SetTodoList tracking** - Check logs for progress markers
+2. **Poll periodically** - `process action:poll sessionId:XXX`
+3. **Background + notify** - Add wake trigger to prompt (see main SKILL.md)
+
+---
+
+### File Count Expectations
+
+Set realistic expectations for file creation timing:
+
+| File Count | Expected Duration | Timeout Setting |
+|------------|-------------------|-----------------|
+| 1-3 files | 2-4 minutes | 120s |
+| 5-10 files | 5-8 minutes | 300s |
+| 10-20 files | 8-12 minutes | 600s |
+| 20+ files | 12-15+ minutes | 900s |
+
+**Example:** 17 files typically takes ~10 minutes.
+
+---
+
+### Verification Step
+
+**Always verify file creation completed successfully:**
+
+```bash
+# After Kimi finishes, check files exist
+bash workdir:~/project command:"find . -type f | head -20"
+
+# Or get file tree
+bash workdir:~/project command:"tree -L 2"
+
+# Verify specific file
+bash workdir:~/project command:"ls -la index.html"
+```
+
+**What to check:**
+- All expected files exist
+- Files have content (non-zero size)
+- Directory structure matches request
 
 ---
 
@@ -280,8 +408,11 @@ bash workdir:~/project command:"kimi --thinking --yolo -p 'Design architecture'"
 ## Key Takeaways
 
 1. **Primary pattern:** Direct file creation + StrReplaceFile for edits
-2. **Fallback pattern:** Return content (only when direct writes fail)
-3. **Always non-PTY** for file operations
-4. **Always explicit timeouts** (300s+ for creation)
-5. **Chunk large tasks** - don't ask for multi-file returns
-6. **No HTTP servers** in sandboxed environments
+2. **Wording matters:** Use "write to disk" language for reliability
+3. **Experimental fallback:** StrReplaceFile on empty files (before return-content)
+4. **Last-resort fallback:** Return content (only when all else fails)
+5. **Always non-PTY** for file operations
+6. **Always explicit timeouts** (300s+ for creation, based on file count)
+7. **Chunk large tasks** - don't ask for multi-file returns
+8. **Verify after creation** - Use `find` or `tree` to confirm files
+9. **No HTTP servers** in sandboxed environments

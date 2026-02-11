@@ -11,10 +11,20 @@ metadata:
 
 Use bash to run coding agents (Codex, Claude Code, Kimi, Pi, OpenCode) for automated coding tasks.
 
+## ⚠️ CRITICAL: PTY Mode by Agent
+
+> 🚨 **Kimi: NEVER use PTY for file operations** — causes indefinite hangs on writes
+> 
+> 🟢 **Kimi: Always use NON-PTY** — `bash workdir:~/project command:"kimi ..."`
+>
+> 🟢 **Codex/Claude: Always use PTY** — `bash pty:true workdir:~/project command:"codex ..."`
+
+---
+
 ## Quick Start
 
 ```bash
-# Kimi - create files (non-PTY)
+# Kimi - create files (NON-PTY mode)
 bash workdir:~/project timeout:300 command:"kimi --yolo -p 'Create React app with src/, package.json'"
 
 # Kimi - edit files (StrReplaceFile)
@@ -46,13 +56,17 @@ bash pty:true workdir:~/project command:"claude 'Refactor auth module'"
 ### Pattern 1: File Creation with Kimi
 
 ```bash
-bash workdir:~/project timeout:300 command:"kimi --yolo -p 'Build a portfolio with:
+# Create files
+bash workdir:~/project timeout:300 command:"kimi --yolo -p 'Write all files directly to disk:
 - index.html
 - css/variables.css, css/components.css
 - js/main.js'"
+
+# Verify creation
+bash workdir:~/project command:"find . -type f | wc -l && tree -L 2"
 ```
 
-**Why:** Kimi writes files directly and reliably in parallel.
+**Why:** Kimi writes files directly and reliably in parallel. Explicit "write to disk" wording works best. Always verify after creation.
 
 ---
 
@@ -93,15 +107,33 @@ bash workdir:~/project timeout:120 command:"kimi --yolo -p 'Update components.cs
 2. **Codex/Claude: PTY required** - They need PTY for proper operation
 3. **Use explicit timeouts** - 300s+ for file creation, 120s+ for edits
 4. **StrReplaceFile for edits** - More reliable than returning content
-5. **No HTTP servers in sandbox** - Testing phases with `http-server` get SIGKILL
-6. **Codex needs git repo** - Won't run outside trusted git directory
-7. **Kimi doesn't need git** - Works in any directory
+5. **Wording matters for Kimi** - Use "write to disk" language for reliability
+6. **Kill if hung** - If "Composing..." >5 min with no files, kill and retry
+7. **No HTTP servers in sandbox** - Testing phases with `http-server` get SIGKILL
+8. **Codex needs git repo** - Won't run outside trusted git directory
+9. **Kimi doesn't need git** - Works in any directory
 
 ---
 
 ## Fallback Pattern (When Direct Writes Fail)
 
-If file writes hang (rare with non-PTY), use this fallback:
+### Experimental Fallback First 🧪
+
+Try creating an empty file, then using StrReplaceFile:
+
+```bash
+# Step 1: Create empty file
+bash workdir:~/project command:"kimi --yolo -p 'Create empty file PRD.md'"
+
+# Step 2: Populate with StrReplaceFile
+bash workdir:~/project timeout:120 command:"kimi --yolo -p 'Write PRD content to PRD.md. Use StrReplaceFile.'"
+```
+
+**Status:** Experimental - keeps Kimi in "file operation mode." Test if direct writes hang.
+
+### Return-Content Fallback (Last Resort)
+
+If StrReplaceFile fallback also fails:
 
 ```bash
 # 1. Get content instead of file write
@@ -111,7 +143,7 @@ Return in a markdown code block. Do not write files.'"
 # 2. Use OpenClaw WriteFile tool with the returned content
 ```
 
-**Note:** This is a fallback, not the primary pattern. Direct writes usually work.
+**Note:** This is a last-resort fallback. Direct writes usually work.
 
 ---
 
@@ -141,13 +173,16 @@ bash pty:true workdir:~/project command:"codex exec --full-auto 'Task'"
 
 ## Timeouts
 
-| Task Type | Timeout | Example |
-|-----------|---------|---------|
-| Quick read | 60s | "What does this function do?" |
-| Single edit | 120s | StrReplaceFile one file |
-| Multi-file creation | 300s | Create 5-15 files |
-| Complex refactor | 300-600s | Redesign with multiple changes |
-| Full build | 600s+ | Complete application |
+| Task Type | Timeout | Example | Expected Duration |
+|-----------|---------|---------|-------------------|
+| Quick read | 60s | "What does this function do?" | 10-30s |
+| Single edit | 120s | StrReplaceFile one file | 2-3 min |
+| Multi-file creation | 300s | Create 5-10 files | 5-8 min |
+| Large file creation | 600s | Create 15-20 files | 10-15 min |
+| Complex refactor | 300-600s | Redesign with multiple changes | 8-15 min |
+| Full build | 600s+ | Complete application | 15+ min |
+
+**Rule of thumb:** ~30-45 seconds per file for multi-file creation.
 
 ---
 
@@ -284,7 +319,12 @@ When done run: openclaw gateway wake --text \"API ready\" --mode now'"
 
 ### File writes hang
 
-**Kimi:** Ensure non-PTY mode. If still hanging, use fallback pattern.
+**Kimi:** Ensure non-PTY mode. If "Composing..." >5 min with no file output:
+
+1. **Kill the session:** `process action:kill sessionId:XXX`
+2. **Retry with different wording** - Use "write to disk" phrasing
+3. **Try experimental fallback** - Create empty file + StrReplaceFile
+4. **Use return-content fallback** - Last resort (see Fallback Pattern section)
 
 ### "Not a git repository"
 
