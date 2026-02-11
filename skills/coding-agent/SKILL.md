@@ -11,19 +11,38 @@ metadata:
 
 Use **bash** (with optional background mode) for all coding agent work. Simple and effective.
 
-## ⚠️ PTY Mode Required!
+## ⚠️ PTY Mode
 
-Coding agents (Codex, Claude Code, Kimi, Pi) are **interactive terminal applications** that need a pseudo-terminal (PTY) to work correctly. Without PTY, you'll get broken output, missing colors, or the agent may hang.
+Coding agents are **interactive terminal applications** that typically need a pseudo-terminal (PTY) to work correctly. However, **PTY behavior varies significantly by agent**:
 
-**Always use `pty:true`** when running coding agents:
+### PTY Recommendations by Agent
+
+| Agent | Recommended Mode | Notes |
+|-------|------------------|-------|
+| **Kimi** | **Non-PTY (default)** | PTY causes indefinite hangs on file writes. Use PTY only for interactive chat sessions. |
+| **Codex** | **PTY recommended** | Requires git repo. PTY works reliably. |
+| **Claude** | **PTY recommended** | PTY works well for interactive mode. |
+| **OpenCode** | Test both | Behavior varies by platform. |
+| **Pi** | **PTY recommended** | PTY works well. |
 
 ```bash
-# ✅ Correct - with PTY
-bash pty:true command:"codex exec 'Your prompt'"
+# ✅ Kimi - Non-PTY for file operations (default recommendation)
+bash workdir:~/project command:"kimi --yolo -p 'Build a todo app'"
 
-# ❌ Wrong - no PTY, agent may break
-bash command:"codex exec 'Your prompt'"
+# ✅ Codex/Claude - PTY recommended
+bash pty:true workdir:~/project command:"codex exec --full-auto 'Build a todo app'"
+
+# ⚠️ Kimi with PTY - only for interactive chat (no file writes)
+bash pty:true workdir:~/project command:"kimi"
 ```
+
+### Non-PTY Mode: What to Expect
+
+When using non-PTY mode (recommended for Kimi):
+- **No streaming output** — You'll see "Composing..." until completion
+- **Use longer timeouts** — 180-300s for file generation tasks
+- **Output appears all at once** — When the agent finishes
+- **More reliable file writes** — The tradeoff for no streaming
 
 ### Bash Tool Parameters
 
@@ -51,20 +70,44 @@ bash command:"codex exec 'Your prompt'"
 
 ---
 
+## Agent-Specific Quick Reference
+
+### Recommended Flags by Task Type
+
+| Task | Kimi | Codex | Claude | Pi |
+|------|------|-------|--------|-----|
+| **Create/Build** | `--yolo -p` | `exec --full-auto` | (interactive) | `-p` |
+| **Edit files** | `--yolo -p` | `exec --full-auto` | (interactive) | `-p` |
+| **Review code** | `-p` | `review` | (interactive) | `-p` |
+| **Quick question** | `-p` | `exec` | (interactive) | `-p` |
+
+### Key Flags Explained
+
+| Agent | Flag | What It Does |
+|-------|------|--------------|
+| **Kimi** | `--yolo` / `-y` | Auto-approve all operations |
+| **Kimi** | `-p 'prompt'` | One-shot mode (exits when done) |
+| **Codex** | `exec 'prompt'` | One-shot execution, exits when done |
+| **Codex** | `--full-auto` | Auto-approves changes in workspace |
+| **Codex** | `--yolo` | No sandbox, no approvals (dangerous) |
+| **All** | `--thinking` | Enable deep reasoning mode |
+
+---
+
 ## Quick Start: One-Shot Tasks
 
 For quick prompts/chats:
 
 ```bash
-# Kimi (no git required!)
+# Kimi (no git required!) - Non-PTY recommended
 SCRATCH=$(mktemp -d)
-bash pty:true workdir:$SCRATCH command:"kimi -p 'Your prompt here'"
+bash workdir:$SCRATCH command:"kimi --yolo -p 'Your prompt here'"
 
-# Codex (needs a git repo!)
+# Codex (needs a git repo!) - PTY recommended
 SCRATCH=$(mktemp -d) && cd $SCRATCH && git init && codex exec "Your prompt here"
 
-# Or in a real project - with PTY!
-bash pty:true workdir:~/Projects/myproject command:"kimi -p 'Add error handling to the API calls'"
+# Or in a real project
+bash workdir:~/Projects/myproject command:"kimi --yolo -p 'Add error handling to the API calls'"
 bash pty:true workdir:~/Projects/myproject command:"codex exec 'Add error handling to the API calls'"
 ```
 
@@ -101,6 +144,23 @@ process action:kill sessionId:XXX
 ```
 
 **Why workdir matters:** Agent wakes up in a focused directory, doesn't wander off reading unrelated files (like your soul.md 😅).
+
+---
+
+## Foreground vs Background: When to Use Each
+
+| Use Case | Mode | Timeout | Example |
+|----------|------|---------|---------|
+| Quick questions (<30s) | Foreground | 60s | "What does this function do?" |
+| Single file edits | Foreground | 120s | "Add error handling to auth.js" |
+| Multi-file changes | Background | 300s+ | "Refactor the auth module" |
+| Long builds/tests | Background | 600s+ | "Build and test the full app" |
+| Parallel batch work | Background | 300s+ | "Review 5 PRs simultaneously" |
+
+**Guidelines:**
+- **Foreground**: You wait for the result; good for quick tasks where you need the output immediately
+- **Background**: Returns a sessionId; use for long tasks or when you want to run multiple agents in parallel
+- **Always use explicit timeouts** — Don't rely on defaults for long tasks
 
 ---
 
@@ -228,40 +288,40 @@ bash pty:true command:"pi --provider openai --model gpt-4o-mini -p 'Your task'"
 ### Basic Usage
 
 ```bash
-# Interactive mode
+# Interactive mode (PTY needed for TUI)
 bash pty:true workdir:~/project command:"kimi"
 
-# One-shot prompt (exits when done)
-bash pty:true workdir:~/project command:"kimi -p 'Your task'"
+# One-shot prompt - Non-PTY recommended for file operations
+bash workdir:~/project command:"kimi --yolo -p 'Your task'"
 
-# With auto-approve
-bash pty:true workdir:~/project command:"kimi --yolo -p 'Your task'"
+# With explicit timeout for generation tasks
+bash timeout:180 workdir:~/project command:"kimi --yolo -p 'Build a dashboard'"
 
 # Background session
-bash pty:true workdir:~/project background:true command:"kimi -p 'Your task'"
+bash workdir:~/project background:true timeout:300 command:"kimi --yolo -p 'Your task'"
 ```
 
 ### Building/Creating
 
 ```bash
-# Quick one-shot with auto-approve
-bash pty:true workdir:~/project command:"kimi --yolo -p 'Build a dark mode toggle'"
+# Quick one-shot with auto-approve - Non-PTY
+bash workdir:~/project command:"kimi --yolo -p 'Build a dark mode toggle'"
 
-# Background for longer work
-bash pty:true workdir:~/project background:true command:"kimi --yolo -p 'Refactor the auth module'"
+# Background for longer work with timeout
+bash workdir:~/project background:true timeout:300 command:"kimi --yolo -p 'Refactor the auth module'"
 
 # With thinking mode enabled (deep reasoning)
-bash pty:true workdir:~/project command:"kimi --thinking -p 'Implement a complex algorithm'"
+bash workdir:~/project command:"kimi --thinking --yolo -p 'Design a complex system'"
 ```
 
 ### Session Management
 
 ```bash
-# Resume a previous session
+# Resume a previous session (PTY for interactive TUI)
 bash pty:true workdir:~/project command:"kimi --continue"
 
 # Resume specific session by ID
-bash pty:true workdir:~/project command:"kimi --session abc123 -p 'Continue working on this'"
+bash workdir:~/project command:"kimi --session abc123 -p 'Continue working on this'"
 
 # Note: --continue and --session are mutually exclusive
 ```
@@ -272,13 +332,13 @@ Ralph Loop feeds the same prompt repeatedly until the agent outputs `<choice>STO
 
 ```bash
 # Loop up to 5 times
-bash pty:true workdir:~/project command:"kimi --max-ralph-iterations 5 -p 'Refactor this code until it passes all tests'"
+bash workdir:~/project command:"kimi --max-ralph-iterations 5 -p 'Refactor this code until it passes all tests'"
 
 # Unlimited iterations (until STOP)
-bash pty:true workdir:~/project command:"kimi --max-ralph-iterations -1 -p 'Keep improving this implementation'"
+bash workdir:~/project command:"kimi --max-ralph-iterations -1 -p 'Keep improving this implementation'"
 
 # Disabled (default)
-bash pty:true workdir:~/project command:"kimi --max-ralph-iterations 0 -p 'One-shot task'"
+bash workdir:~/project command:"kimi --max-ralph-iterations 0 -p 'One-shot task'"
 ```
 
 ### Thinking Mode
@@ -287,13 +347,13 @@ Thinking mode enables deep reasoning before the model responds. Requires a model
 
 ```bash
 # Enable thinking mode
-bash pty:true workdir:~/project command:"kimi --thinking -p 'Design a complex system architecture'"
+bash workdir:~/project command:"kimi --thinking --yolo -p 'Design a complex system architecture'"
 
 # Explicitly disable thinking mode
-bash pty:true workdir:~/project command:"kimi --no-thinking -p 'Quick question about this function'"
+bash workdir:~/project command:"kimi --no-thinking --yolo -p 'Quick question about this function'"
 
 # Uses last session's setting if not specified
-bash pty:true workdir:~/project command:"kimi -p 'Your task'"
+bash workdir:~/project command:"kimi --yolo -p 'Your task'"
 ```
 
 ### Scratch Work (No Git Required!)
@@ -303,7 +363,7 @@ Unlike Codex, Kimi doesn't require a git repository. Just use any directory:
 ```bash
 # Create temp directory - no git needed!
 SCRATCH=$(mktemp -d)
-bash pty:true workdir:$SCRATCH command:"kimi --yolo -p 'Your scratch task'"
+bash workdir:$SCRATCH command:"kimi --yolo -p 'Your scratch task'"
 ```
 
 ### Models & Providers
@@ -329,12 +389,12 @@ For fixing multiple issues in parallel, use git worktrees:
 git worktree add -b fix/issue-78 /tmp/issue-78 main
 git worktree add -b fix/issue-99 /tmp/issue-99 main
 
-# 2. Launch agents in each (background + PTY!)
-# Kimi (no git repo needed in worktree)
-bash pty:true workdir:/tmp/issue-78 background:true command:"pnpm install && kimi --yolo -p 'Fix issue #78: <description>. Commit and push.'"
-bash pty:true workdir:/tmp/issue-99 background:true command:"pnpm install && kimi --yolo -p 'Fix issue #99: <description>. Commit and push.'"
+# 2. Launch agents in each (background mode)
+# Kimi (no git repo needed in worktree, non-PTY recommended)
+bash workdir:/tmp/issue-78 background:true timeout:300 command:"pnpm install && kimi --yolo -p 'Fix issue #78: <description>. Commit and push.'"
+bash workdir:/tmp/issue-99 background:true timeout:300 command:"pnpm install && kimi --yolo -p 'Fix issue #99: <description>. Commit and push.'"
 
-# Or use Codex (requires git repo)
+# Or use Codex (requires git repo, PTY recommended)
 bash pty:true workdir:/tmp/issue-78 background:true command:"pnpm install && codex --yolo 'Fix issue #78: <description>. Commit and push.'"
 bash pty:true workdir:/tmp/issue-99 background:true command:"pnpm install && codex --yolo 'Fix issue #99: <description>. Commit and push.'"
 
@@ -355,7 +415,7 @@ git worktree remove /tmp/issue-99
 
 ## ⚠️ Rules
 
-1. **Always use pty:true** - coding agents need a terminal!
+1. **PTY depends on the agent** - Use non-PTY for Kimi (file writes hang with PTY). Use PTY for Codex and Claude.
 2. **Respect tool choice** - if user asks for Codex, use Codex.
    - Orchestrator mode: do NOT hand-code patches yourself.
    - If an agent fails/hangs, respawn it or ask the user for direction, but don't silently take over.
@@ -399,12 +459,12 @@ openclaw system event --text "Done: [brief summary of what was built]" --mode no
 **Example:**
 
 ```bash
-# Kimi
-bash pty:true workdir:~/project background:true command:"kimi --yolo -p 'Build a REST API for todos.
+# Kimi (non-PTY recommended)
+bash workdir:~/project background:true timeout:300 command:"kimi --yolo -p 'Build a REST API for todos.
 
 When completely finished, run: openclaw gateway wake --text \"Done: Built todos REST API with CRUD endpoints\" --mode now'"
 
-# Codex
+# Codex (PTY recommended)
 bash pty:true workdir:~/project background:true command:"codex --yolo exec 'Build a REST API for todos.
 
 When completely finished, run: openclaw system event --text \"Done: Built todos REST API with CRUD endpoints\" --mode now'"
@@ -414,12 +474,125 @@ This triggers an immediate wake event — Skippy gets pinged in seconds, not 10 
 
 ---
 
+## Troubleshooting
+
+### File Write Operations Hang
+
+**Symptoms:** Agent starts, reads files fine, but gets stuck at "Now I'll create..." and never completes file writes.
+
+**Solutions:**
+
+1. **Use non-PTY mode for Kimi** - PTY causes indefinite hangs on file writes:
+   ```bash
+   # Non-PTY for Kimi (default recommendation)
+   bash workdir:~/project command:"kimi --yolo -p 'Your task'"
+   ```
+
+2. **Use longer timeouts** - Default 60s is too short for generation tasks:
+   ```bash
+   # Longer timeout for file generation
+   bash timeout:180 workdir:~/project command:"kimi --yolo -p 'Your task'"
+   ```
+
+3. **Fallback to content return** - If agent can't write files, have it return the content so OpenClaw can write directly:
+   ```
+   "If file write operations don't work, output the complete file content 
+   in a code block and I'll handle writing it."
+   ```
+
+### Session Stalls Without Output
+
+**Symptoms:** Background session starts but produces no output.
+
+**Check:**
+- Is the working directory valid?
+- Does Codex have a git repo? (Kimi doesn't need one)
+- Try polling the session: `process action:poll sessionId:XXX`
+- Check logs: `process action:log sessionId:XXX`
+
+### Platform-Specific Notes
+
+| Platform | Notes |
+|----------|-------|
+| Linux/Docker | Kimi PTY mode may hang on file writes — use non-PTY |
+| macOS | PTY mode usually works for all agents |
+| WSL | Test both modes; may vary by WSL version |
+
+---
+
+## Timeout Recommendations
+
+| Task Type | Timeout | Notes |
+|-----------|---------|-------|
+| Quick read/analysis | 60s | File reading, simple questions |
+| Small file edits | 120s | Single file changes |
+| Feature implementation | 300s+ | Multi-file changes, builds |
+| Large refactoring | 600s+ | Complex rewrites, testing |
+
+**Always use explicit timeouts** - Don't rely on defaults for long tasks:
+```bash
+# Good - explicit timeout for Kimi (non-PTY)
+bash timeout:300 workdir:~/project command:"kimi --yolo -p 'Build a dashboard'"
+
+# Good - explicit timeout for Codex (PTY)
+bash pty:true timeout:300 workdir:~/project command:"codex exec --full-auto 'Build a dashboard'"
+```
+
+---
+
+## Fallback Pattern: When Agents Can't Write Files
+
+**Use this pattern when:**
+- Agent hangs during file write operations (common with Kimi + PTY)
+- You want more control over file creation
+- Agent file operations fail silently
+
+### Step-by-Step Fallback
+
+**Step 1: Ask agent to return content instead of writing**
+
+```bash
+bash workdir:~/project timeout:180 command:"kimi --yolo -p 'Create a todo app with HTML/CSS/JS.
+IMPORTANT: Do NOT write files directly. 
+Instead, return the complete code in markdown code blocks.
+Label each block with the filename like: ```html filename=index.html```
+'"
+```
+
+**Step 2: Parse the agent output and write files with OpenClaw tools**
+
+The agent output will look like:
+```
+Here's the todo app:
+
+```html filename=index.html
+<!DOCTYPE html>
+<html>...</html>
+```
+
+```css filename=styles.css
+body { ... }
+```
+```
+
+Extract each code block and use `WriteFile` to create the files.
+
+### Why This Works
+
+- Bypasses agent file operation issues entirely
+- You have full control over file naming and location
+- No hanging on WriteFile operations
+- Works reliably with Kimi in non-PTY mode
+
+---
+
 ## Learnings (Jan 2026)
 
-- **PTY is essential:** Coding agents are interactive terminal apps. Without `pty:true`, output breaks or agent hangs.
+- **PTY varies by agent:** Codex and Claude usually need PTY. Kimi requires non-PTY for file operations — PTY causes indefinite hangs.
 - **Git repo required:** Codex won't run outside a git directory. Use `mktemp -d && git init` for scratch work. **Kimi doesn't need git** - works in any directory.
 - **exec is your friend:** `codex exec "prompt"` runs and exits cleanly - perfect for one-shots. Kimi uses `-p` or `--prompt` instead.
 - **submit vs write:** Use `submit` to send input + Enter, `write` for raw data without newline.
 - **Sass works:** Codex responds well to playful prompts. Asked it to write a haiku about being second fiddle to a space lobster, got: _"Second chair, I code / Space lobster sets the tempo / Keys glow, I follow"_ 🦞
 - **Kimi's Ralph Loop:** `--max-ralph-iterations N` is great for iterative tasks - feeds the same prompt repeatedly until `<choice>STOP</choice>`.
 - **Kimi's Thinking Mode:** `--thinking` enables deep reasoning (like Claude's thinking models). Requires a model that supports the `thinking` capability.
+- **File write hangs:** Kimi in PTY mode may hang indefinitely during WriteFile operations. Use non-PTY mode or the fallback pattern (return content instead of writing).
