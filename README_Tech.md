@@ -63,6 +63,15 @@ Credentials for external APIs used by skills are stored in isolated paths:
   - `email` - Gmail account email address (valtteri.melkko@gmail.com)
   - `app_password` - Gmail App Password (16-character IMAP authentication token)
 
+- **`secret/skills-apis/stackexchange/`**
+  - `value` - Stack Exchange API key for accessing Stack Overflow and other SE sites
+
+- **`secret/skills-apis/serpapi/`**
+  - `value` - SerpAPI key for Google search result scraping
+
+- **`secret/skills-apis/youtube/`**
+  - `value` - YouTube Data API v3 key for video search and analytics
+
 **Note**: Skills APIs are stored separately from OpenClaw core secrets to prevent credential exposure in OpenClaw's environment while still being accessible to refactored skill scripts running as the `openclaw` user.
 
 ### Accessing Vault Secrets
@@ -250,13 +259,13 @@ The OpenClaw bot has read/write access to five directories via symlinks in the w
 
 ### Accessible Repositories
 
-| Symlink | Target Directory | Purpose | GitHub Sync |
-|---------|-----------------|---------|-------------|
-| `skills-global` | `/root/.skills-global` | Global skills library | ✅ Synced |
-| `ai_product_visualizer` | `/root/ai_product_visualizer` | Product visualization tools | ✅ Synced |
-| `buildersuite` | `/root/buildersuite` | Builder suite projects | ✅ Synced |
-| `meta-project-for-mvps` | `/root/meta-project-for-mvps` | Meta project for MVPs | ✅ Synced |
-| `opari` | `/root/opari` | Opari project files | ❌ Not synced |
+| Symlink                 | Target Directory              | Purpose                     | GitHub Sync   |
+| ----------------------- | ----------------------------- | --------------------------- | ------------- |
+| `skills-global`         | `/root/.skills-global`        | Global skills library       | ✅ Synced     |
+| `ai_product_visualizer` | `/root/ai_product_visualizer` | Product visualization tools | ✅ Synced     |
+| `buildersuite`          | `/root/buildersuite`          | Builder suite projects      | ✅ Synced     |
+| `meta-project-for-mvps` | `/root/meta-project-for-mvps` | Meta project for MVPs       | ✅ Synced     |
+| `opari`                 | `/root/opari`                 | Opari project files         | ❌ Not synced |
 
 ### Access Implementation Details
 
@@ -287,6 +296,7 @@ getfacl /root | grep openclaw
 ```
 
 This allows openclaw to:
+
 - ✅ Traverse into `/root/` to reach symlinks
 - ✅ Access symlinked directories and their contents
 - ❌ List `/root/` directory contents
@@ -301,6 +311,7 @@ This allows openclaw to:
 #### Repository Permissions
 
 All target directories are:
+
 - Group-owned by `openclaw` group
 - Have group read/write/execute permissions (`rwx`)
 - Allow openclaw to read, write, and execute files
@@ -331,6 +342,7 @@ git config --global --list | grep safe.directory
 ```
 
 This allows openclaw to:
+
 - Clone/pull from repositories
 - Commit changes
 - Push to remote
@@ -338,6 +350,7 @@ This allows openclaw to:
 ### Accessing Repositories from Bot
 
 Ask the bot to work on files within these directories:
+
 ```
 "Check /workspace/skills-global/config.json"
 "Create a new file in /workspace/buildersuite/..."
@@ -355,6 +368,7 @@ The bot will work within the workspace and changes are preserved in the target d
 To grant openclaw read/write access to a new directory in `/root/`:
 
 **As root user:**
+
 ```bash
 # 1. Set group ownership to openclaw
 sudo chgrp -R openclaw /root/new-directory
@@ -374,6 +388,7 @@ sudo su - openclaw -c "git config --global --add safe.directory /root/new-direct
 To revoke openclaw's access to a directory:
 
 **As root user:**
+
 ```bash
 # 1. Remove symlink from workspace
 sudo rm /home/openclaw/.openclaw/workspace/directory-name
@@ -391,6 +406,7 @@ sudo chgrp -R root /root/directory-name
 To verify openclaw can access a directory:
 
 **As openclaw user:**
+
 ```bash
 # 1. Check symlink exists
 ls -la ~/.openclaw/workspace/directory-name
@@ -405,7 +421,9 @@ cd ~/.openclaw/workspace/directory-name && git status
 ## Troubleshooting Guide
 
 ### Overview
+
 Most OpenClaw issues stem from:
+
 1. Secrets not loading from Vault
 2. Gateway not starting properly
 3. Configuration errors
@@ -424,6 +442,7 @@ sudo systemctl status vault openclaw
 ```
 
 **Issue**: Service shows `inactive (dead)` or restart counter is high (>10)
+
 - **Cause**: Gateway failed to start
 - **Solution**: Check gateway logs (see step 2)
 
@@ -442,12 +461,12 @@ sudo journalctl -u vault -n 50 --no-pager
 
 **Common Errors and Solutions**:
 
-| Error | Cause | Solution |
-|-------|-------|----------|
-| `Missing env var "GLM_API_KEY"` | Secrets not loaded from Vault | Verify Vault is running, check secrets in Vault, restart service |
-| `EADDRINUSE: address already in use :::8081` | Another process using port 8081 | Kill the process: `lsof -i :8081` or change port in config |
-| `Connection refused` (Vault) | Vault not running or not listening | Start Vault: `sudo systemctl start vault` |
-| `Gateway not responding` | Gateway crashed or not listening | Check listening ports: `ss -tlnp \| grep 8081` |
+| Error                                        | Cause                              | Solution                                                         |
+| -------------------------------------------- | ---------------------------------- | ---------------------------------------------------------------- |
+| `Missing env var "GLM_API_KEY"`              | Secrets not loaded from Vault      | Verify Vault is running, check secrets in Vault, restart service |
+| `EADDRINUSE: address already in use :::8081` | Another process using port 8081    | Kill the process: `lsof -i :8081` or change port in config       |
+| `Connection refused` (Vault)                 | Vault not running or not listening | Start Vault: `sudo systemctl start vault`                        |
+| `Gateway not responding`                     | Gateway crashed or not listening   | Check listening ports: `ss -tlnp \| grep 8081`                   |
 
 #### 3. **Test Vault Connection**
 
@@ -464,10 +483,12 @@ curl -s -H "X-Vault-Token: $VAULT_TOKEN" \
 ```
 
 **Expected Output**:
+
 - Seal status: `"sealed":false`
 - Secrets: Keys like `"GLM_API_KEY"`, `"OPENROUTER_API_KEY"`, etc.
 
 **If Sealed**: Unseal Vault manually:
+
 ```bash
 UNSEAL_KEY=$(cat ~/.vault/init-keys.json | grep -o '"keys":\["[^"]*"' | cut -d'"' -f4)
 curl -X PUT http://127.0.0.1:8200/v1/sys/unseal -d "{\"key\": \"$UNSEAL_KEY\"}"
@@ -490,6 +511,7 @@ timeout 5 /home/openclaw/.npm-global/bin/openclaw gateway run || true
 **Expected**: Gateway starts without "Missing env var" errors
 
 **If Missing Environment Variables**:
+
 1. Check Vault is running: `sudo systemctl status vault`
 2. Test secret retrieval: See step 3
 3. Regenerate environment file:
@@ -508,6 +530,7 @@ ss -tlnp | grep 8081
 ```
 
 **If Not Listening**:
+
 - Gateway likely crashed or hung during startup
 - Check logs (step 2)
 - Try restarting: `sudo systemctl restart openclaw`
@@ -535,6 +558,7 @@ openclaw doctor --verbose
 ```
 
 **Look for**:
+
 - ✅ "Config" section: Should show no errors
 - ✅ "Gateway" section: Should show "Gateway running"
 - ✅ "Telegram" section: Should show bot connected
@@ -544,6 +568,7 @@ openclaw doctor --verbose
 #### **Issue: Bot doesn't respond to messages**
 
 **Diagnosis**:
+
 ```bash
 # 1. Check gateway is running
 sudo systemctl status openclaw | grep Active
@@ -562,6 +587,7 @@ curl -s -H "X-Vault-Token: $VAULT_TOKEN" \
 ```
 
 **Solutions**:
+
 1. **Gateway Not Running**:
    - Restart: `sudo systemctl restart openclaw`
    - Check logs: `sudo journalctl -u openclaw -n 50`
@@ -583,6 +609,7 @@ curl -s -H "X-Vault-Token: $VAULT_TOKEN" \
 #### **Issue: Gateway crashes on startup**
 
 **Diagnosis**:
+
 ```bash
 # Check if restarting frequently
 systemctl status openclaw | grep "restart counter"
@@ -592,6 +619,7 @@ sudo journalctl -u openclaw -n 100 | grep -E "Error|Failed|Exception"
 ```
 
 **Solutions**:
+
 1. **Missing Secrets**:
    - Verify Vault is running and unsealed
    - Test secret loading: `source ~/.openclaw/load-vault-secrets.sh`
@@ -620,6 +648,7 @@ ps -o pid,vsz,rss -p $(pgrep -f "openclaw gateway")"
 ```
 
 **Solutions**:
+
 1. Restart service: `sudo systemctl restart openclaw`
 2. Check for hung processes: `sudo systemctl stop openclaw && sleep 2 && sudo systemctl start openclaw`
 3. Review logs for error loops
@@ -689,6 +718,7 @@ done
 ## File Locations
 
 ### Configuration
+
 - **OpenClaw Config**: `~/.openclaw/openclaw.json` (600)
 - **Vault Config**: `~/.vault/config.hcl` (600)
 - **Vault Init Keys**: `~/.vault/init-keys.json` (600) - **CRITICAL: Backup this file!**
@@ -698,10 +728,12 @@ done
 - **OpenClaw Gateway Wrapper**: `~/.openclaw/start-gateway.sh` (700)
 
 ### Services
+
 - **Vault Service**: `/etc/systemd/system/vault.service`
 - **OpenClaw Service**: `/etc/systemd/system/openclaw.service`
 
 ### Data
+
 - **Vault Data**: `~/.vault/data/` (700)
 - **OpenClaw Workspace**: `~/.openclaw/workspace/` (700)
   - **Symlinks to Bot-Accessible Directories**:
@@ -714,6 +746,7 @@ done
 - **OpenClaw Credentials**: `~/.openclaw/credentials/` (700)
 
 ### Source Code
+
 - **OpenClaw Source**: `/home/openclaw/openclaw-source/`
 - **OpenClaw Binary**: `~/.npm-global/bin/openclaw`
 
@@ -750,6 +783,7 @@ tar -tzf ~/openclaw-backup-$(date +%Y%m%d).tar.gz
 ## Testing Telegram Bot
 
 ### Prerequisites
+
 - OpenClaw service must be running: `sudo systemctl status openclaw`
 - Gateway must be listening: `ss -tlnp | grep 8081`
 - Telegram bot token must be valid
@@ -777,6 +811,7 @@ tar -tzf ~/openclaw-backup-$(date +%Y%m%d).tar.gz
    ```
 
 ### Expected Behavior
+
 - Messages are received by the bot
 - Bot responds with AI-generated text
 - Response time: 10-30 seconds depending on model
@@ -784,13 +819,13 @@ tar -tzf ~/openclaw-backup-$(date +%Y%m%d).tar.gz
 
 ### Telegram Bot Troubleshooting
 
-| Issue | Cause | Solution |
-|-------|-------|----------|
-| No `/start` response | Bot not connected to Telegram | Check `TELEGRAM_BOT_TOKEN` in Vault |
-| Messages ignored after `/start` | Gateway not running | Restart: `sudo systemctl restart openclaw` |
-| Wrong user receives messages | User ID mismatch | Check `TELEGRAM_USER_ID` in Vault and config |
-| Slow responses | Model is slow/unavailable | Check `openclaw doctor`, fallback models |
-| Connection timeout | API unreachable | Check internet, firewall, API status |
+| Issue                           | Cause                         | Solution                                     |
+| ------------------------------- | ----------------------------- | -------------------------------------------- |
+| No `/start` response            | Bot not connected to Telegram | Check `TELEGRAM_BOT_TOKEN` in Vault          |
+| Messages ignored after `/start` | Gateway not running           | Restart: `sudo systemctl restart openclaw`   |
+| Wrong user receives messages    | User ID mismatch              | Check `TELEGRAM_USER_ID` in Vault and config |
+| Slow responses                  | Model is slow/unavailable     | Check `openclaw doctor`, fallback models     |
+| Connection timeout              | API unreachable               | Check internet, firewall, API status         |
 
 ## Security Notes
 
@@ -882,6 +917,7 @@ sudo systemctl restart openclaw
 ```
 
 **Important Notes**:
+
 1. **Preserve Existing Keys**: Always include all existing keys in the update payload or they will be lost
 2. **Environment Variable Format**: Use `${KEY_NAME}` format in config files to reference Vault secrets
 3. **Restart Required**: OpenClaw must be restarted to load new environment variables
@@ -890,6 +926,7 @@ sudo systemctl restart openclaw
 6. **Vault Token**: The token from `~/.vault/vault-env.sh` must still be valid (re-login if expired)
 
 **Example Use Cases**:
+
 - Adding a new model provider API key (e.g., `CLAUDE_API_KEY`)
 - Adding service credentials (e.g., `DATABASE_URL`, `REDIS_PASSWORD`)
 - Adding notification service tokens (e.g., `SLACK_WEBHOOK_URL`)
@@ -907,6 +944,7 @@ sudo systemctl restart openclaw
 **Gateway Command**: `openclaw gateway run` (started via wrapper script)
 
 ### Bot Workspace Access
+
 - **5 directories** accessible via workspace symlinks (4 GitHub-synced, 1 not synced)
 - **Data protection**: All changes backed up to GitHub
 - **Use case**: Development assistance with code files and projects
