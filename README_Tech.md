@@ -80,6 +80,9 @@ Credentials for external APIs used by skills are stored in isolated paths:
 - **`secret/skills-apis/twitterapi/`**
   - `api_key` - TwitterAPI.io API key for Twitter/X trend discovery (format: `new1_xxxx...`)
 
+- **`secret/skills-apis/daily-ideas/`**
+  - `recipient` - Email address for daily SaaS ideas reports
+
 **Note**: Skills APIs are stored separately from OpenClaw core secrets to prevent credential exposure in OpenClaw's environment while still being accessible to refactored skill scripts running as the `openclaw` user.
 
 ### Accessing Vault Secrets
