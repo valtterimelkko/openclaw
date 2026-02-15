@@ -77,6 +77,9 @@ Credentials for external APIs used by skills are stored in isolated paths:
   - `client_id` (optional) - Reddit OAuth2 client ID for higher rate limits
   - `client_secret` (optional) - Reddit OAuth2 client secret
 
+- **`secret/skills-apis/twitterapi/`**
+  - `api_key` - TwitterAPI.io API key for Twitter/X trend discovery (format: `new1_xxxx...`)
+
 **Note**: Skills APIs are stored separately from OpenClaw core secrets to prevent credential exposure in OpenClaw's environment while still being accessible to refactored skill scripts running as the `openclaw` user.
 
 ### Accessing Vault Secrets
@@ -940,7 +943,7 @@ sudo systemctl restart openclaw
 ---
 
 **Installation Date**: 2026-02-02
-**Last Updated**: 2026-02-15 (Added Reddit proxy credentials to vault)
+**Last Updated**: 2026-02-15 (Added TwitterAPI.io credential to vault)
 **OpenClaw Version**: 2026.2.1
 **Vault Version**: 1.18.3
 **Node Version**: v24.13.0
