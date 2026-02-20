@@ -1,9 +1,10 @@
 ---
 name: coding-agent
-description: Run Codex CLI, Claude Code, Kimi Code CLI, OpenCode, or Pi Coding Agent via background process for programmatic control.
+description: "Delegate coding tasks to Codex, Claude Code, Kimi Code CLI, OpenCode, or Pi agents via background process. Use when: (1) building/creating new features or apps, (2) reviewing PRs (spawn in temp dir), (3) refactoring large codebases, (4) iterative coding that needs file exploration. NOT for: simple one-liner fixes (just edit), reading code (use read tool), or any work in ~/clawd workspace (never spawn agents here). Requires a bash tool that supports pty:true."
 metadata:
   {
-    "openclaw": { "emoji": "🧩", "requires": { "anyBins": ["claude", "codex", "kimi", "opencode", "pi"] } },
+    "openclaw":
+      { "emoji": "🧩", "requires": { "anyBins": ["claude", "codex", "kimi", "opencode", "pi"] } },
   }
 ---
 
@@ -14,7 +15,7 @@ Use bash to run coding agents (Codex, Claude Code, Kimi, Pi, OpenCode) for autom
 ## ⚠️ CRITICAL: PTY Mode by Agent
 
 > 🚨 **Kimi: NEVER use PTY for file operations** — causes indefinite hangs on writes
-> 
+>
 > 🟢 **Kimi: Always use NON-PTY** — `bash workdir:~/project command:"kimi ..."`
 >
 > 🟢 **Codex/Claude: Always use PTY** — `bash pty:true workdir:~/project command:"codex ..."`
@@ -41,13 +42,13 @@ bash pty:true workdir:~/project command:"claude 'Refactor auth module'"
 
 ## Agent Selection Guide
 
-| Agent | Best For | Git Required | PTY Mode | See Details |
-|-------|----------|--------------|----------|-------------|
-| **Kimi** | File creation, editing, fast iteration | ❌ No | ❌ Non-PTY | [references/kimi.md](references/kimi.md) |
-| **Codex** | Sandboxed execution, PR reviews | ✅ Yes | ✅ Required | [references/codex.md](references/codex.md) |
-| **Claude** | Interactive refactoring, exploration | ✅ Yes | ✅ Required | [references/claude.md](references/claude.md) |
-| **Pi** | Quick tasks, alternative provider | ❌ No | ✅ Recommended | Below |
-| **OpenCode** | Open-source alternative | ❌ No | ⚠️ Varies | Below |
+| Agent        | Best For                               | Git Required | PTY Mode       | See Details                                  |
+| ------------ | -------------------------------------- | ------------ | -------------- | -------------------------------------------- |
+| **Kimi**     | File creation, editing, fast iteration | ❌ No        | ❌ Non-PTY     | [references/kimi.md](references/kimi.md)     |
+| **Codex**    | Sandboxed execution, PR reviews        | ✅ Yes       | ✅ Required    | [references/codex.md](references/codex.md)   |
+| **Claude**   | Interactive refactoring, exploration   | ✅ Yes       | ✅ Required    | [references/claude.md](references/claude.md) |
+| **Pi**       | Quick tasks, alternative provider      | ❌ No        | ✅ Recommended | Below                                        |
+| **OpenCode** | Open-source alternative                | ❌ No        | ⚠️ Varies      | Below                                        |
 
 ---
 
@@ -86,12 +87,14 @@ Use StrReplaceFile.'"
 ### Pattern 3: Chunk Large Changes
 
 **Don't:** Ask for multiple large file returns (hangs)
+
 ```bash
 # AVOID - hangs indefinitely
 bash workdir:~/project command:"kimi -p 'Return all 8 redesigned CSS files...'"
 ```
 
 **Do:** Break into sequential edits
+
 ```bash
 # Step 1
 bash workdir:~/project timeout:120 command:"kimi --yolo -p 'Update variables.css. Use StrReplaceFile.'"
@@ -173,14 +176,14 @@ bash pty:true workdir:~/project command:"codex exec --full-auto 'Task'"
 
 ## Timeouts
 
-| Task Type | Timeout | Example | Expected Duration |
-|-----------|---------|---------|-------------------|
-| Quick read | 60s | "What does this function do?" | 10-30s |
-| Single edit | 120s | StrReplaceFile one file | 2-3 min |
-| Multi-file creation | 300s | Create 5-10 files | 5-8 min |
-| Large file creation | 600s | Create 15-20 files | 10-15 min |
-| Complex refactor | 300-600s | Redesign with multiple changes | 8-15 min |
-| Full build | 600s+ | Complete application | 15+ min |
+| Task Type           | Timeout  | Example                        | Expected Duration |
+| ------------------- | -------- | ------------------------------ | ----------------- |
+| Quick read          | 60s      | "What does this function do?"  | 10-30s            |
+| Single edit         | 120s     | StrReplaceFile one file        | 2-3 min           |
+| Multi-file creation | 300s     | Create 5-10 files              | 5-8 min           |
+| Large file creation | 600s     | Create 15-20 files             | 10-15 min         |
+| Complex refactor    | 300-600s | Redesign with multiple changes | 8-15 min          |
+| Full build          | 600s+    | Complete application           | 15+ min           |
 
 **Rule of thumb:** ~30-45 seconds per file for multi-file creation.
 
@@ -214,6 +217,7 @@ process action:kill sessionId:XXX
 **Install:** `curl -LsSf https://code.kimi.com/install.sh | bash`
 
 **Key flags:**
+
 - `--yolo` / `-y` - Auto-approve
 - `-p 'prompt'` - One-shot mode
 - `--thinking` - Deep reasoning
@@ -229,6 +233,7 @@ process action:kill sessionId:XXX
 **Requirements:** Git repository, PTY mode
 
 **Key flags:**
+
 - `exec 'prompt'` - One-shot
 - `--full-auto` - Auto-approve in workspace
 - `--yolo` - No sandbox (dangerous)
@@ -279,10 +284,16 @@ Run multiple agents simultaneously:
 bash workdir:/tmp/feature-a background:true timeout:300 command:"kimi --yolo -p 'Build auth'"
 bash workdir:/tmp/feature-b background:true timeout:300 command:"kimi --yolo -p 'Build dashboard'"
 
+<<<<<<< HEAD
 # Codex - PR review army
 git fetch origin '+refs/pull/*/head:refs/remotes/origin/pr/*'
 bash pty:true workdir:~/project background:true command:"codex exec 'Review PR #86'"
 bash pty:true workdir:~/project background:true command:"codex exec 'Review PR #87'"
+=======
+# 2. Launch Codex in each (background + PTY!)
+bash pty:true workdir:/tmp/issue-78 background:true command:"pnpm install && codex --yolo 'Fix issue #78: <description>. Commit and push.'"
+bash pty:true workdir:/tmp/issue-99 background:true command:"pnpm install && codex --yolo 'Fix issue #99 from the approved ticket summary. Implement only the in-scope edits and commit after review.'"
+>>>>>>> upstream/main
 
 # Monitor all
 process action:list
@@ -343,8 +354,8 @@ Don't start HTTP servers in prompts. Resource limits kill them.
 
 ## See Also
 
-| File | Contents |
-|------|----------|
-| [references/kimi.md](references/kimi.md) | Complete Kimi CLI guide, patterns, troubleshooting |
-| [references/codex.md](references/codex.md) | Codex CLI guide, PR reviews, flags |
-| [references/claude.md](references/claude.md) | Claude Code guide, interactive workflows |
+| File                                         | Contents                                           |
+| -------------------------------------------- | -------------------------------------------------- |
+| [references/kimi.md](references/kimi.md)     | Complete Kimi CLI guide, patterns, troubleshooting |
+| [references/codex.md](references/codex.md)   | Codex CLI guide, PR reviews, flags                 |
+| [references/claude.md](references/claude.md) | Claude Code guide, interactive workflows           |
